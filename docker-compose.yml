@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  gvhmr:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: gvhmr-app
+    ports:
+      - "5000:5000"
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    volumes:
+      - ./results:/app/results
+      - ./models:/app/gvhmr/inputs/checkpoints
+      - ./body_models:/app/gvhmr/inputs/checkpoints/body_models
+    restart: unless-stopped
+    networks:
+      - gvhmr-network
+
+networks:
+  gvhmr-network:
+    driver: bridge

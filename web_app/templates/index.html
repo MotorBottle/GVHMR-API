@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GVHMR - World-Grounded Human Motion Recovery</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>GVHMR - World-Grounded Human Motion Recovery</h1>
+            <p class="subtitle">3D Human Motion Recovery from Video</p>
+        </header>
+
+        <div class="content">
+            <!-- Documentation Section -->
+            <section class="documentation">
+                <h2>Documentation</h2>
+
+                <div class="doc-section">
+                    <h3>What is GVHMR?</h3>
+                    <p>GVHMR (Gravity-View Human Motion Recovery) is a state-of-the-art system that recovers 3D human motion from video in world-grounded coordinates. Unlike traditional methods that estimate pose in camera space, GVHMR provides world-coordinate results using gravity-view coordinates.</p>
+                </div>
+
+                <div class="doc-section">
+                    <h3>System Status</h3>
+                    <div class="model-status">
+                        <h4>Required Models:</h4>
+                        <ul>
+                            {% for model, installed in model_status.items() %}
+                            <li>
+                                <span class="status-indicator {{ 'installed' if installed else 'missing' }}"></span>
+                                {{ model }}: {{ 'Installed' if installed else 'Missing' }}
+                            </li>
+                            {% endfor %}
+                        </ul>
+                        {% if not model_status.values()|select|list|length == model_status|length %}
+                        <div class="warning">
+                            <strong>Warning:</strong> Some models are missing. Please download them before processing videos.
+                            <details>
+                                <summary>Download Instructions</summary>
+                                <ol>
+                                    <li>Create directories: <code>models/gvhmr</code>, <code>models/hmr2</code>, <code>models/vitpose</code>, <code>models/yolo</code></li>
+                                    <li>Download model checkpoints from <a href="https://github.com/zju3dv/GVHMR" target="_blank">GVHMR repository</a></li>
+                                    <li>Download SMPL/SMPLX body models and place in <code>body_models/</code></li>
+                                    <li>Restart the container: <code>docker compose up --build -d</code></li>
+                                </ol>
+                            </details>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="doc-section">
+                    <h3>How to Use</h3>
+                    <ol>
+                        <li><strong>Upload Video:</strong> Select a video file (MP4, AVI, MOV, or MKV format, max 500MB)</li>
+                        <li><strong>Configure Settings:</strong> Choose whether your camera is static or moving</li>
+                        <li><strong>Process:</strong> Click "Process Video" and wait for the analysis to complete</li>
+                        <li><strong>Download Results:</strong> View and download the processed motion data</li>
+                    </ol>
+                </div>
+
+                <div class="doc-section">
+                    <h3>Camera Settings</h3>
+                    <ul>
+                        <li><strong>Static Camera:</strong> Use this option if the camera was stationary during recording. This skips visual odometry for faster processing.</li>
+                        <li><strong>Moving Camera:</strong> Use this option if the camera was moving. GVHMR will estimate camera motion using SimpleVO.</li>
+                    </ul>
+                </div>
+
+                <div class="doc-section">
+                    <h3>Output Format</h3>
+                    <p>GVHMR produces:</p>
+                    <ul>
+                        <li>3D human pose and shape parameters (SMPL format)</li>
+                        <li>World-grounded motion trajectories</li>
+                        <li>Visualization files (if enabled)</li>
+                    </ul>
+                </div>
+
+                <div class="doc-section">
+                    <h3>Technical Details</h3>
+                    <ul>
+                        <li><strong>Paper:</strong> SIGGRAPH Asia 2024</li>
+                        <li><strong>Repository:</strong> <a href="https://github.com/zju3dv/GVHMR" target="_blank">github.com/zju3dv/GVHMR</a></li>
+                        <li><strong>Requirements:</strong> GPU with CUDA support (NVIDIA recommended)</li>
+                        <li><strong>Processing Time:</strong> Varies based on video length and resolution (typically 5-10 minutes for a 30-second clip)</li>
+                    </ul>
+                </div>
+            </section>
+
+            <!-- Processing Section -->
+            <section class="processing">
+                <h2>Process Video</h2>
+
+                <div class="upload-section">
+                    <div class="file-input-wrapper">
+                        <input type="file" id="videoFile" accept="video/mp4,video/avi,video/mov,video/x-matroska">
+                        <label for="videoFile" class="file-input-label">Choose Video File</label>
+                        <span id="fileName" class="file-name">No file selected</span>
+                    </div>
+
+                    <div class="settings">
+                        <label>
+                            <input type="checkbox" id="staticCamera" checked>
+                            Static Camera (skip visual odometry)
+                        </label>
+                    </div>
+
+                    <button id="uploadBtn" class="btn btn-primary" disabled>Upload Video</button>
+                    <button id="processBtn" class="btn btn-success" disabled>Process Video</button>
+                </div>
+
+                <div id="statusMessage" class="status-message"></div>
+                <div id="progressSection" class="progress-section" style="display: none;">
+                    <div class="progress-bar">
+                        <div id="progressBar" class="progress-fill"></div>
+                    </div>
+                    <p id="progressText">Processing...</p>
+                </div>
+
+                <div id="resultsSection" class="results-section" style="display: none;">
+                    <h3>Results</h3>
+                    <div id="resultsList"></div>
+                </div>
+            </section>
+        </div>
+
+        <footer>
+            <p>GVHMR &copy; 2024 | <a href="https://github.com/zju3dv/GVHMR" target="_blank">GitHub Repository</a></p>
+        </footer>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+</body>
+</html>
