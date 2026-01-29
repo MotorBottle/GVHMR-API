@@ -75,7 +75,23 @@ def parse_args_to_cfg():
         "If the camera zoom in a lot, you can try 135, 200 or even larger values.",
     )
     parser.add_argument("--verbose", action="store_true", help="If true, draw intermediate results")
+
+    # Video output control
+    parser.add_argument("--video_render", type=lambda x: x.lower() == 'true', default=True,
+                       help="Enable/disable video rendering (true/false). If false, only generates PT files.")
+    parser.add_argument("--video_type", type=str, default="all",
+                       help="Comma-separated list: mesh_incam,mesh_global,mesh_comparison,skeleton_incam,skeleton_only or 'all'")
+
     args = parser.parse_args()
+
+    # Parse video types
+    if args.video_render:
+        if args.video_type.lower() == 'all':
+            enabled_videos = {'mesh_incam', 'mesh_global', 'mesh_comparison', 'skeleton_incam', 'skeleton_only'}
+        else:
+            enabled_videos = set(vtype.strip() for vtype in args.video_type.split(','))
+    else:
+        enabled_videos = set()  # No videos
 
     # Input
     video_path = Path(args.video)
@@ -102,6 +118,7 @@ def parse_args_to_cfg():
 
     # Output
     Log.info(f"[Output Dir]: {cfg.output_dir}")
+    Log.info(f"[Video Output Control] Enabled: {enabled_videos if enabled_videos else 'None (PT files only)'}")
     Path(cfg.output_dir).mkdir(parents=True, exist_ok=True)
     Path(cfg.preprocess_dir).mkdir(parents=True, exist_ok=True)
 
@@ -115,7 +132,7 @@ def parse_args_to_cfg():
         writer.close()
         reader.close()
 
-    return cfg
+    return cfg, enabled_videos
 
 
 @torch.no_grad()
@@ -321,7 +338,7 @@ def render_global(cfg):
 
 
 def main():
-    cfg = parse_args_to_cfg()
+    cfg, enabled_videos = parse_args_to_cfg()
     paths = cfg.paths
 
     Log.info(f"[GPU]: {torch.cuda.get_device_name()}")
@@ -344,34 +361,76 @@ def main():
         Log.info(f"[HMR4D] Elapsed: {Log.sync_time() - tic:.2f}s for data-length={data_time:.1f}s")
         torch.save(pred, paths.hmr4d_results)
 
-    # ===== Render Original Outputs ===== #
-    render_incam(cfg)
-    render_global(cfg)
-    if not Path(paths.incam_global_horiz_video).exists():
-        Log.info("[Merge Videos]")
-        merge_videos_horizontal([paths.incam_video, paths.global_video], paths.incam_global_horiz_video)
+    # ===== Render Outputs (Conditional) ===== #
+    enabled = enabled_videos
 
-    # ===== NEW: Render Skeleton Outputs ===== #
-    Log.info("[Skeleton Rendering] Starting")
+    # Mesh rendering
+    if 'mesh_incam' in enabled:
+        Log.info("[Render] Mesh incam")
+        render_incam(cfg)
+        # Rename to better name
+        old_path = Path(cfg.paths.incam_video)
+        new_path = Path(cfg.output_dir) / "mesh_incam.mp4"
+        if old_path.exists() and not new_path.exists():
+            old_path.rename(new_path)
+            Log.info(f"  Renamed: {old_path.name} -> {new_path.name}")
 
-    # Define skeleton output paths
-    skeleton_incam_path = Path(cfg.output_dir) / "skeleton_incam.mp4"
-    skeleton_only_path = Path(cfg.output_dir) / "skeleton_only.mp4"
-    joints_json_path = Path(cfg.output_dir) / "joints.json"
+    if 'mesh_global' in enabled:
+        Log.info("[Render] Mesh global")
+        render_global(cfg)
+        # Rename to better name
+        old_path = Path(cfg.paths.global_video)
+        new_path = Path(cfg.output_dir) / "mesh_global.mp4"
+        if old_path.exists() and not new_path.exists():
+            old_path.rename(new_path)
+            Log.info(f"  Renamed: {old_path.name} -> {new_path.name}")
 
-    # Render skeleton overlay on input video
-    render_skeleton_incam(cfg, skeleton_incam_path)
+    if 'mesh_comparison' in enabled:
+        # Need both mesh videos for comparison
+        mesh_incam_path = Path(cfg.output_dir) / "mesh_incam.mp4"
+        mesh_global_path = Path(cfg.output_dir) / "mesh_global.mp4"
 
-    # Render skeleton on black background
-    render_skeleton_only(cfg, skeleton_only_path)
+        if mesh_incam_path.exists() and mesh_global_path.exists():
+            Log.info("[Merge Videos] Creating mesh comparison")
+            comparison_path = Path(cfg.output_dir) / "mesh_comparison.mp4"
+            if not comparison_path.exists():
+                merge_videos_horizontal([str(mesh_incam_path), str(mesh_global_path)], str(comparison_path))
+                Log.info(f"  Created: {comparison_path.name}")
+        else:
+            Log.warn("[Merge Videos] Skipped - need both mesh_incam and mesh_global")
 
-    # Save joint positions to JSON
-    save_joints_json(cfg, joints_json_path)
+    # Skeleton rendering
+    if 'skeleton_incam' in enabled:
+        Log.info("[Render] Skeleton incam")
+        skeleton_incam_path = Path(cfg.output_dir) / "skeleton_incam.mp4"
+        render_skeleton_incam(cfg, skeleton_incam_path)
 
-    Log.info("[Complete] All outputs generated")
-    Log.info(f"  Mesh videos: {paths.incam_video}, {paths.global_video}")
-    Log.info(f"  Skeleton videos: {skeleton_incam_path}, {skeleton_only_path}")
-    Log.info(f"  Joint data: {joints_json_path}")
+    if 'skeleton_only' in enabled:
+        Log.info("[Render] Skeleton only")
+        skeleton_only_path = Path(cfg.output_dir) / "skeleton_only.mp4"
+        render_skeleton_only(cfg, skeleton_only_path)
+
+    # Always save joints JSON if any skeleton rendering was done
+    if 'skeleton_incam' in enabled or 'skeleton_only' in enabled:
+        Log.info("[Save] Joint positions JSON")
+        joints_json_path = Path(cfg.output_dir) / "joints.json"
+        save_joints_json(cfg, joints_json_path)
+
+    # Rename input video copy to better name
+    old_input = Path(cfg.paths.input_video) if hasattr(cfg.paths, 'input_video') else Path(cfg.video_path)
+    new_input = Path(cfg.output_dir) / "input.mp4"
+    if old_input.exists() and old_input != new_input and not new_input.exists():
+        try:
+            old_input.rename(new_input)
+            Log.info(f"  Renamed input: {old_input.name} -> input.mp4")
+        except:
+            pass  # May not exist or already renamed
+
+    Log.info("[Complete] Processing finished")
+    if enabled:
+        Log.info(f"  Generated videos: {', '.join(sorted(enabled))}")
+    else:
+        Log.info(f"  No videos generated (PT files only)")
 
 
 if __name__ == "__main__":

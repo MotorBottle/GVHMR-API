@@ -82,9 +82,14 @@ def process_video():
         data = request.json
         filename = data.get('filename')
         use_static_camera = data.get('static_camera', True)
-        render_skeleton = data.get('render_skeleton', False)  # NEW: skeleton rendering option
+        render_skeleton = data.get('render_skeleton', False)
 
-        logger.info(f"Processing request for file: {filename}, static_camera: {use_static_camera}, render_skeleton: {render_skeleton}")
+        # Video output control
+        video_render = data.get('video_render', True)
+        video_type = data.get('video_type', 'all')
+
+        logger.info(f"Processing request for file: {filename}, static_camera: {use_static_camera}, " +
+                   f"render_skeleton: {render_skeleton}, video_render: {video_render}, video_type: {video_type}")
 
         if not filename:
             logger.error("No filename provided")
@@ -139,6 +144,11 @@ def process_video():
 
         if use_static_camera:
             cmd.append('-s')
+
+        # Add video control parameters (only for skeleton demo)
+        if render_skeleton:
+            cmd.append(f'--video_render={str(video_render).lower()}')
+            cmd.append(f'--video_type={video_type}')
 
         # Run GVHMR
         logger.info(f"Running command: {' '.join(cmd)}")
