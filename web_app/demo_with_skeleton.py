@@ -270,7 +270,13 @@ def render_incam(cfg):
     # -- render mesh -- #
     verts_incam = pred_c_verts
     writer = get_writer(incam_video_path, fps=30, crf=CRF)
-    for i, img_raw in tqdm(enumerate(reader), total=get_video_lwh(video_path)[0], desc=f"Rendering Incam"):
+
+    # Use minimum of video length and vertices length to avoid index errors
+    num_frames = min(length, len(verts_incam))
+
+    for i, img_raw in tqdm(enumerate(reader), total=num_frames, desc=f"Rendering Incam"):
+        if i >= num_frames:
+            break  # Stop if we run out of vertex data
         img = renderer.render_mesh(verts_incam[i].cuda(), img_raw, [0.8, 0.8, 0.8])
         writer.write_frame(img)
     writer.close()
@@ -328,7 +334,8 @@ def render_global(cfg):
     renderer.set_ground(scale * 1.5, cx, cz)
     color = torch.ones(3).float().cuda() * 0.8
 
-    render_length = length if not debug_cam else 8
+    # Use minimum of video length and vertices length to avoid index errors
+    render_length = min(length, len(verts_glob)) if not debug_cam else 8
     writer = get_writer(global_video_path, fps=30, crf=CRF)
     for i in tqdm(range(render_length), desc=f"Rendering Global"):
         cameras = renderer.create_camera(global_R[i], global_T[i])

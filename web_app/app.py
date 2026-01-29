@@ -64,13 +64,19 @@ def upload_file():
         return jsonify({'error': 'No file selected'}), 400
 
     if file and allowed_file(file.filename):
-        filename = secure_filename(file.filename)
-        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        # Add timestamp to filename to avoid caching issues
+        import time
+        original_filename = secure_filename(file.filename)
+        name_parts = os.path.splitext(original_filename)
+        timestamp = str(int(time.time() * 1000))  # milliseconds timestamp
+        unique_filename = f"{name_parts[0]}_{timestamp}{name_parts[1]}"
+
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
         file.save(filepath)
 
         return jsonify({
             'success': True,
-            'filename': filename,
+            'filename': unique_filename,
             'message': 'File uploaded successfully'
         })
 

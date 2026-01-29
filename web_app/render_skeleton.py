@@ -66,7 +66,13 @@ def render_skeleton_incam(cfg, output_skeleton_path):
     reader = get_video_reader(video_path)
     writer = get_writer(str(output_skeleton_path), fps=30, crf=CRF)
 
-    for i, img_raw in tqdm(enumerate(reader), total=length, desc="Rendering Skeleton Incam"):
+    # Use minimum of video length and joints length to avoid index errors
+    num_frames = min(length, len(joints_2d))
+
+    for i, img_raw in tqdm(enumerate(reader), total=num_frames, desc="Rendering Skeleton Incam"):
+        if i >= num_frames:
+            break  # Stop if we run out of joint data
+
         # Draw skeleton
         img = draw_smpl_skeleton_on_image(
             img_raw,
@@ -130,7 +136,10 @@ def render_skeleton_only(cfg, output_skeleton_path):
     # Render skeleton on black background
     writer = get_writer(str(output_skeleton_path), fps=30, crf=CRF)
 
-    for i in tqdm(range(length), desc="Rendering Skeleton Only"):
+    # Use minimum of video length and joints length to avoid index errors
+    num_frames = min(length, len(joints_2d))
+
+    for i in tqdm(range(num_frames), desc="Rendering Skeleton Only"):
         # Create black background
         black_bg = np.zeros((height, width, 3), dtype=np.uint8)
 

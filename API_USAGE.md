@@ -92,7 +92,10 @@ Process an uploaded video to extract human motion.
 ```json
 {
   "filename": "video.mp4",
-  "static_camera": true
+  "static_camera": true,
+  "render_skeleton": false,
+  "video_render": true,
+  "video_type": "all"
 }
 ```
 
@@ -102,12 +105,65 @@ Process an uploaded video to extract human motion.
   - `true`: Use static camera mode (faster, no DPVO required)
   - `false`: Use moving camera mode (requires DPVO model)
   - Default: `true`
+- `render_skeleton` (boolean, optional):
+  - `true`: Use skeleton demo (enables skeleton visualization and video control)
+  - `false`: Use standard mesh demo
+  - Default: `false`
+- `video_render` (boolean, optional):
+  - `true`: Generate videos
+  - `false`: Skip all video rendering, only generate PT files (90% faster)
+  - Default: `true`
+  - **Note**: Only works when `render_skeleton: true`
+- `video_type` (string, optional):
+  - `"all"`: Generate all video types
+  - Comma-separated list of specific types:
+    - `"mesh_incam"` - Mesh overlay on input video
+    - `"mesh_global"` - Mesh from global camera view
+    - `"mesh_comparison"` - Side-by-side mesh comparison
+    - `"skeleton_incam"` - Skeleton overlay on input video
+    - `"skeleton_only"` - Skeleton on black background
+  - Default: `"all"`
+  - **Note**: Only works when `render_skeleton: true`
 
-**Example:**
+**Examples:**
+
+**Basic processing (mesh only):**
 ```bash
 curl -X POST \
   -H "Content-Type: application/json" \
   -d '{"filename":"video.mp4","static_camera":true}' \
+  http://localhost:5000/process
+```
+
+**Skeleton visualization:**
+```bash
+curl -X POST \
+  -H "Content-Type: application/json" \
+  -d '{"filename":"video.mp4","static_camera":true,"render_skeleton":true}' \
+  http://localhost:5000/process
+```
+
+**Fast processing (PT files only, no videos):**
+```bash
+curl -X POST \
+  -H "Content-Type: application/json" \
+  -d '{"filename":"video.mp4","static_camera":true,"render_skeleton":true,"video_render":false}' \
+  http://localhost:5000/process
+```
+
+**Selective video output (only skeleton videos):**
+```bash
+curl -X POST \
+  -H "Content-Type: application/json" \
+  -d '{"filename":"video.mp4","static_camera":true,"render_skeleton":true,"video_type":"skeleton_incam,skeleton_only"}' \
+  http://localhost:5000/process
+```
+
+**Single video type (mesh incam only):**
+```bash
+curl -X POST \
+  -H "Content-Type: application/json" \
+  -d '{"filename":"video.mp4","static_camera":true,"render_skeleton":true,"video_type":"mesh_incam"}' \
   http://localhost:5000/process
 ```
 
@@ -132,6 +188,85 @@ curl -X POST \
   "message": "Please download the required model checkpoints. See documentation."
 }
 ```
+
+---
+
+## Video Output Control
+
+### Overview
+
+When using `render_skeleton: true`, you get full control over video generation with improved naming.
+
+### Better File Naming
+
+**Old naming** (standard demo):
+- `0_input_video.mp4`, `1_incam.mp4`, `2_global.mp4`
+
+**New naming** (skeleton demo):
+- `input.mp4`, `mesh_incam.mp4`, `mesh_global.mp4`, `skeleton_incam.mp4`, etc.
+
+PT files keep original names (`hmr4d_results.pt`, `preprocess/*.pt`)
+
+### Video Control Parameters
+
+**Skip all videos** (fastest, PT files only):
+```json
+{
+  "filename": "video.mp4",
+  "static_camera": true,
+  "render_skeleton": true,
+  "video_render": false
+}
+```
+→ Result: Only PT files, ~30 seconds (90% faster)
+
+**Generate specific videos only:**
+```json
+{
+  "filename": "video.mp4",
+  "static_camera": true,
+  "render_skeleton": true,
+  "video_type": "skeleton_incam,mesh_incam"
+}
+```
+→ Result: Only skeleton overlay + mesh overlay, ~3 minutes
+
+**All videos** (default):
+```json
+{
+  "filename": "video.mp4",
+  "static_camera": true,
+  "render_skeleton": true,
+  "video_type": "all"
+}
+```
+→ Result: All 5 video types, ~6-7 minutes
+
+### Available Video Types
+
+| Type | Description | Size | Time |
+|------|-------------|------|------|
+| `mesh_incam` | Mesh overlay on input | ~2MB | ~2min |
+| `mesh_global` | Mesh global view | ~2MB | ~2min |
+| `mesh_comparison` | Side-by-side comparison | ~3MB | <1s |
+| `skeleton_incam` | Skeleton overlay | ~1MB | ~1min |
+| `skeleton_only` | Skeleton on black | ~800KB | ~1min |
+
+### Use Cases
+
+**Development/Testing:**
+- Use `video_render: false` for instant PT file generation
+
+**API/Programmatic:**
+- Use `video_type: "skeleton_only"` for lightweight visualization
+
+**Full Analysis:**
+- Use `video_type: "all"` for complete output
+
+**Quick Preview:**
+- Use `video_type: "mesh_incam"` for single overlay
+
+See [VIDEO_OUTPUT_GUIDE.md](VIDEO_OUTPUT_GUIDE.md) for comprehensive documentation.
 
 ---
 
@@ -255,13 +390,15 @@ upload_data = response.json()
 filename = upload_data["filename"]
 print(f"Uploaded: {filename}")
 
-# 2. Process video
+# 2. Process video (with video control)
 print("Processing video... (this may take 5-10 minutes)")
 response = requests.post(
     f"{API_URL}/process",
     json={
         "filename": filename,
-        "static_camera": True
+        "static_camera": True,
+        "render_skeleton": True,
+        "video_type": "skeleton_incam,mesh_incam"  # Only 2 videos instead of all
     }
 )
 
@@ -300,11 +437,13 @@ async function processVideo(videoPath) {
     const filename = uploadResponse.data.filename;
     console.log(`Uploaded: ${filename}`);
 
-    // 2. Process video
+    // 2. Process video (with video control)
     console.log('Processing video... (this may take 5-10 minutes)');
     const processResponse = await axios.post(`${API_URL}/process`, {
         filename: filename,
-        static_camera: true
+        static_camera: true,
+        render_skeleton: true,
+        video_type: 'skeleton_incam,mesh_incam'  // Only 2 videos instead of all
     });
 
     const outputPath = processResponse.data.output_path;
@@ -328,16 +467,56 @@ processVideo('sample.mp4');
 
 ## Result Files
 
-The ZIP contains these files:
+### Standard Files (Always Generated)
 
-- `hmr4d_results.pt` - Main SMPL parameters (body pose, shape, translation)
-- `preprocess/vitpose.pt` - 2D keypoint detections
-- `preprocess/vit_features.pt` - Deep learning features
-- `preprocess/bbx.pt` - Bounding boxes
-- `preprocess/slam_results.pt` - Camera poses
-- `render.mp4` - Visualization video (if generated)
+**Data Files:**
+- `hmr4d_results.pt` - Main SMPL parameters (body pose, shape, translation) ~320KB
+- `preprocess/bbx.pt` - Bounding boxes ~3KB
+- `preprocess/vitpose.pt` - 2D keypoint detections ~16KB
+- `preprocess/vit_features.pt` - Deep learning features ~300KB
+- `preprocess/slam_results.pt` - Camera poses (only for moving camera) ~15KB
 
-See [CLAUDE.md](CLAUDE.md) for detailed file format documentation.
+### Video Files (Generated Based on Parameters)
+
+**With `render_skeleton: false` (default, mesh only):**
+- `0_input_video.mp4` - Copy of input video
+- `1_incam.mp4` - Mesh overlay on input (in-camera view)
+- `2_global.mp4` - Mesh from global camera view
+- `{name}_3_incam_global_horiz.mp4` - Side-by-side comparison
+
+**With `render_skeleton: true` (skeleton demo with new naming):**
+
+All videos use descriptive names:
+- `input.mp4` - Copy of input video
+- `mesh_incam.mp4` - Mesh overlay on input video
+- `mesh_global.mp4` - Mesh from global camera view
+- `mesh_comparison.mp4` - Side-by-side mesh comparison
+- `skeleton_incam.mp4` - Skeleton overlay on input video
+- `skeleton_only.mp4` - Skeleton on black background
+- `joints.json` - Joint positions in JSON format ~150KB
+
+**Video Control:**
+- Use `video_render: false` to skip all videos (only PT files, 90% faster)
+- Use `video_type` to select specific videos (e.g., `"skeleton_incam,mesh_incam"`)
+
+### File Sizes (74-frame example)
+
+| File Type | Size | Time to Generate |
+|-----------|------|------------------|
+| PT files (all) | ~650KB | ~30s |
+| input.mp4 | ~2MB | <1s (copy) |
+| mesh_incam.mp4 | ~2MB | ~2min |
+| mesh_global.mp4 | ~2MB | ~2min |
+| mesh_comparison.mp4 | ~3MB | <1s (merge) |
+| skeleton_incam.mp4 | ~1MB | ~1min |
+| skeleton_only.mp4 | ~800KB | ~1min |
+| joints.json | ~150KB | <1s |
+
+**Performance:**
+- All videos: ~6-7 minutes
+- PT files only (`video_render: false`): ~30 seconds
+
+See [VIDEO_OUTPUT_GUIDE.md](VIDEO_OUTPUT_GUIDE.md) for complete documentation on video control.
 
 ---
 
@@ -357,10 +536,14 @@ See [CLAUDE.md](CLAUDE.md) for detailed file format documentation.
 
 ## Performance Notes
 
-- **Processing time**: 5-10 minutes per video (depends on length and GPU)
+- **Processing time**:
+  - PT files only (`video_render: false`): ~30 seconds (90% faster)
+  - Selective videos: 1-3 minutes depending on types
+  - All videos: 5-10 minutes per video (depends on length and GPU)
 - **Concurrent requests**: Process one video at a time (no queue system currently)
-- **Timeout**: Set client timeout to 15+ minutes for long videos
+- **Timeout**: Set client timeout to 15+ minutes for long videos (or 2 minutes for PT-only)
 - **GPU memory**: ~8GB VRAM recommended
+- **Optimization tip**: Use `render_skeleton: true` with `video_render: false` for fastest processing during development
 
 ---
 
