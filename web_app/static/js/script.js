@@ -6,6 +6,7 @@ const fileNameDisplay = document.getElementById('fileName');
 const uploadBtn = document.getElementById('uploadBtn');
 const processBtn = document.getElementById('processBtn');
 const staticCameraCheckbox = document.getElementById('staticCamera');
+const renderSkeletonCheckbox = document.getElementById('renderSkeleton');
 const statusMessage = document.getElementById('statusMessage');
 const progressSection = document.getElementById('progressSection');
 const progressBar = document.getElementById('progressBar');
@@ -78,7 +79,8 @@ async function handleProcess() {
 
     const requestData = {
         filename: uploadedFilename,
-        static_camera: staticCameraCheckbox.checked
+        static_camera: staticCameraCheckbox.checked,
+        render_skeleton: renderSkeletonCheckbox.checked
     };
 
     try {

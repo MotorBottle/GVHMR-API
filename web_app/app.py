@@ -82,8 +82,9 @@ def process_video():
         data = request.json
         filename = data.get('filename')
         use_static_camera = data.get('static_camera', True)
+        render_skeleton = data.get('render_skeleton', False)  # NEW: skeleton rendering option
 
-        logger.info(f"Processing request for file: {filename}, static_camera: {use_static_camera}")
+        logger.info(f"Processing request for file: {filename}, static_camera: {use_static_camera}, render_skeleton: {render_skeleton}")
 
         if not filename:
             logger.error("No filename provided")
@@ -119,13 +120,22 @@ def process_video():
         output_path = os.path.join(RESULTS_FOLDER, output_name)
         os.makedirs(output_path, exist_ok=True)
         logger.info(f"Output directory: {output_path}")
-        # Build command
-        cmd = [
-            'python',
-            '/app/gvhmr/tools/demo/demo.py',
-            f'--video={input_path}',
-            f'--output_root={output_path}'
-        ]
+
+        # Build command - use skeleton demo if requested
+        if render_skeleton:
+            cmd = [
+                'python',
+                '/app/web_app/demo_with_skeleton.py',
+                f'--video={input_path}',
+                f'--output_root={output_path}'
+            ]
+        else:
+            cmd = [
+                'python',
+                '/app/gvhmr/tools/demo/demo.py',
+                f'--video={input_path}',
+                f'--output_root={output_path}'
+            ]
 
         if use_static_camera:
             cmd.append('-s')
