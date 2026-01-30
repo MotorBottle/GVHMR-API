@@ -406,22 +406,26 @@ def main():
         else:
             Log.warn("[Merge Videos] Skipped - need both mesh_incam and mesh_global")
 
-    # Skeleton rendering
-    if 'skeleton_incam' in enabled:
-        Log.info("[Render] Skeleton incam")
-        skeleton_incam_path = Path(cfg.output_dir) / "skeleton_incam.mp4"
-        render_skeleton_incam(cfg, skeleton_incam_path)
-
-    if 'skeleton_only' in enabled:
-        Log.info("[Render] Skeleton only")
-        skeleton_only_path = Path(cfg.output_dir) / "skeleton_only.mp4"
-        render_skeleton_only(cfg, skeleton_only_path)
-
-    # Always save joints JSON if any skeleton rendering was done
+    # Skeleton rendering - OPTIMIZED: Precompute joints once for all functions
     if 'skeleton_incam' in enabled or 'skeleton_only' in enabled:
-        Log.info("[Save] Joint positions JSON")
+        Log.info("[Precompute] Joint positions (once for all skeleton rendering)")
+        from render_skeleton import compute_joints_once
+        precomputed = compute_joints_once(cfg)
+
+        if 'skeleton_incam' in enabled:
+            Log.info("[Render] Skeleton incam (using precomputed data)")
+            skeleton_incam_path = Path(cfg.output_dir) / "skeleton_incam.mp4"
+            render_skeleton_incam(cfg, skeleton_incam_path, precomputed)
+
+        if 'skeleton_only' in enabled:
+            Log.info("[Render] Skeleton only (using precomputed data)")
+            skeleton_only_path = Path(cfg.output_dir) / "skeleton_only.mp4"
+            render_skeleton_only(cfg, skeleton_only_path, precomputed)
+
+        # Always save joints JSON if any skeleton rendering was done
+        Log.info("[Save] Joint positions JSON (using precomputed data)")
         joints_json_path = Path(cfg.output_dir) / "joints.json"
-        save_joints_json(cfg, joints_json_path)
+        save_joints_json(cfg, joints_json_path, precomputed)
 
     # Rename input video copy to better name
     old_input = Path(cfg.paths.input_video) if hasattr(cfg.paths, 'input_video') else Path(cfg.video_path)

@@ -6,7 +6,7 @@ const fileNameDisplay = document.getElementById('fileName');
 const uploadBtn = document.getElementById('uploadBtn');
 const processBtn = document.getElementById('processBtn');
 const staticCameraCheckbox = document.getElementById('staticCamera');
-const renderSkeletonCheckbox = document.getElementById('renderSkeleton');
+const customVideoTypes = document.getElementById('customVideoTypes');
 const statusMessage = document.getElementById('statusMessage');
 const progressSection = document.getElementById('progressSection');
 const progressBar = document.getElementById('progressBar');
@@ -18,6 +18,54 @@ const resultsList = document.getElementById('resultsList');
 videoFileInput.addEventListener('change', handleFileSelect);
 uploadBtn.addEventListener('click', handleUpload);
 processBtn.addEventListener('click', handleProcess);
+
+// Video output radio buttons
+document.querySelectorAll('input[name="videoOutput"]').forEach(radio => {
+    radio.addEventListener('change', handleVideoOutputChange);
+});
+
+function handleVideoOutputChange(e) {
+    // Show custom checkboxes only when "custom" is selected
+    if (e.target.value === 'custom') {
+        customVideoTypes.style.display = 'block';
+    } else {
+        customVideoTypes.style.display = 'none';
+    }
+}
+
+function getVideoParameters() {
+    // Determine video rendering parameters based on user selection
+    const selectedRadio = document.querySelector('input[name="videoOutput"]:checked');
+    if (!selectedRadio) {
+        return { render_skeleton: true, video_render: true, video_type: 'all' };
+    }
+
+    switch (selectedRadio.value) {
+        case 'none':
+            // PT files only - no video rendering, no skeleton needed
+            return { render_skeleton: false, video_render: false };
+        case 'all':
+            // All videos (mesh + skeleton) - skeleton needed
+            return { render_skeleton: true, video_render: true, video_type: 'all' };
+        case 'custom':
+            // Custom selection - check if any skeleton videos are selected
+            const checkedBoxes = Array.from(document.querySelectorAll('.video-type-check:checked'));
+            if (checkedBoxes.length === 0) {
+                // No selection, default to all
+                return { render_skeleton: true, video_render: true, video_type: 'all' };
+            }
+            const videoType = checkedBoxes.map(cb => cb.value).join(',');
+
+            // Enable skeleton rendering ONLY if skeleton videos are requested
+            const needsSkeleton = checkedBoxes.some(cb =>
+                cb.value === 'skeleton_incam' || cb.value === 'skeleton_only'
+            );
+
+            return { render_skeleton: needsSkeleton, video_render: true, video_type: videoType };
+        default:
+            return { render_skeleton: true, video_render: true, video_type: 'all' };
+    }
+}
 
 function handleFileSelect(e) {
     const file = e.target.files[0];
@@ -77,10 +125,13 @@ async function handleProcess() {
     progressText.textContent = 'Starting processing...';
     showMessage('Processing video... This may take several minutes.', 'info');
 
+    // Get video parameters (always uses skeleton demo with video control)
+    const videoParams = getVideoParameters();
+
     const requestData = {
         filename: uploadedFilename,
         static_camera: staticCameraCheckbox.checked,
-        render_skeleton: renderSkeletonCheckbox.checked
+        ...videoParams  // Spread video parameters (render_skeleton, video_render, video_type)
     };
 
     try {

@@ -103,14 +103,36 @@
                     </div>
 
                     <div class="settings">
-                        <label>
-                            <input type="checkbox" id="staticCamera" checked>
-                            Static Camera (skip visual odometry)
-                        </label>
-                        <label>
-                            <input type="checkbox" id="renderSkeleton">
-                            Render Skeleton (joints/rig visualization)
-                        </label>
+                        <div class="setting-group">
+                            <h4>Camera Mode</h4>
+                            <label>
+                                <input type="checkbox" id="staticCamera" checked>
+                                Static Camera (skip visual odometry)
+                            </label>
+                        </div>
+
+                        <div class="setting-group">
+                            <h4>Video Output</h4>
+                            <label style="display: block; margin-bottom: 8px;">
+                                <input type="radio" name="videoOutput" value="none">
+                                None (PT files only - 90% faster, ~30s)
+                            </label>
+                            <label style="display: block; margin-bottom: 8px;">
+                                <input type="radio" name="videoOutput" value="all" checked>
+                                All videos (mesh + skeleton, ~6-7 min)
+                            </label>
+                            <label style="display: block; margin-bottom: 8px;">
+                                <input type="radio" name="videoOutput" value="custom">
+                                Custom selection:
+                            </label>
+                            <div id="customVideoTypes" style="margin-left: 20px; display: none;">
+                                <label style="display: block;"><input type="checkbox" class="video-type-check" value="mesh_incam"> Mesh overlay</label>
+                                <label style="display: block;"><input type="checkbox" class="video-type-check" value="mesh_global"> Mesh global view</label>
+                                <label style="display: block;"><input type="checkbox" class="video-type-check" value="mesh_comparison"> Mesh comparison</label>
+                                <label style="display: block;"><input type="checkbox" class="video-type-check" value="skeleton_incam"> Skeleton overlay</label>
+                                <label style="display: block;"><input type="checkbox" class="video-type-check" value="skeleton_only"> Skeleton on black</label>
+                            </div>
+                        </div>
                     </div>
 
                     <button id="uploadBtn" class="btn btn-primary" disabled>Upload Video</button>
