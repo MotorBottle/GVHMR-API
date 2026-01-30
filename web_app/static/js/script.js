@@ -134,16 +134,35 @@ async function handleProcess() {
         ...videoParams  // Spread video parameters (render_skeleton, video_render, video_type)
     };
 
+    // Start elapsed time counter
+    const startTime = Date.now();
+    let elapsedInterval = null;
+
+    function formatElapsedTime(ms) {
+        const seconds = Math.floor(ms / 1000);
+        const minutes = Math.floor(seconds / 60);
+        const remainingSeconds = seconds % 60;
+        if (minutes > 0) {
+            return `${minutes}m ${remainingSeconds}s`;
+        }
+        return `${seconds}s`;
+    }
+
     try {
-        // Simulate progress (since actual progress is hard to track)
+        // Simulate progress with elapsed time display
         let progress = 10;
         const progressInterval = setInterval(() => {
             if (progress < 90) {
                 progress += 5;
                 progressBar.style.width = progress + '%';
-                progressText.textContent = `Processing... ${progress}%`;
             }
         }, 2000);
+
+        // Update elapsed time every second
+        elapsedInterval = setInterval(() => {
+            const elapsed = Date.now() - startTime;
+            progressText.textContent = `Processing... ${formatElapsedTime(elapsed)}`;
+        }, 1000);
 
         const response = await fetch('/process', {
             method: 'POST',
@@ -154,13 +173,15 @@ async function handleProcess() {
         });
 
         clearInterval(progressInterval);
+        clearInterval(elapsedInterval);
 
         const data = await response.json();
+        const totalElapsed = Date.now() - startTime;
 
         if (response.ok) {
             progressBar.style.width = '100%';
-            progressText.textContent = 'Processing complete!';
-            showMessage('Video processed successfully!', 'success');
+            progressText.textContent = `Processing complete! (${formatElapsedTime(totalElapsed)})`;
+            showMessage(`Video processed successfully in ${formatElapsedTime(totalElapsed)}!`, 'success');
 
             // Show results
             setTimeout(() => {
@@ -188,6 +209,7 @@ async function handleProcess() {
             uploadBtn.disabled = false;
         }
     } catch (error) {
+        if (elapsedInterval) clearInterval(elapsedInterval);
         progressBar.style.width = '0%';
         progressSection.style.display = 'none';
         showMessage(`Processing error: ${error.message}`, 'error');
